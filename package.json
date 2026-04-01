@@ -1,0 +1,16 @@
+{
+  "name": "servcraftassessment",
+  "private": true,
+  "workspaces": [
+    "api-tests",
+    "ui-tests"
+  ],
+  "scripts": {
+    "test": "playwright test --config api-tests/playwright.config.ts && playwright test --config ui-tests/playwright.config.ts",
+    "test:api": "playwright test --config api-tests/playwright.config.ts",
+    "test:ui": "playwright test --config ui-tests/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}
