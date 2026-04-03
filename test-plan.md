@@ -15,12 +15,10 @@ This document follows **Part A** of the ServCraft QA assessment: **Scope**, **Te
 
 ### What is out of scope
 
-- Load, performance, and soak testing.
+- Load and performance testing.
 - Security beyond API-key authentication (e.g. full OWASP-style reviews).
 - Roles and permissions not described in the assessment.
 - Notifications, email delivery, and workflows outside job cards.
-- Data migration and backward-compatibility testing.
-
 ---
 
 ## 2. Test Strategy
@@ -33,7 +31,7 @@ This document follows **Part A** of the ServCraft QA assessment: **Scope**, **Te
 
 ### Manual vs automated
 
-- **Automated (Playwright):** API checks for list-only auth failures, CRUD with cleanup, a fixed set of negatives/edges, and UI smoke plus one **serial** create → edit → delete flow (search by the created **title**). Rows marked **Automated** in §3 are what the suite executes today.
+- **Automated (Playwright):** API checks for list-only auth failures, CRUD with cleanup, a fixed set of negatives/edges, and UI smoke plus one **serial** create → edit → delete flow (search by the created **title**).
 - **Manual / exploratory:** Broader auth (other verbs/routes), deep pagination (gaps, duplicates, page 2+), search + paging interactions, form-only validation, invalid enums on update, email edge cases, and UX around messages and casing—used heavily for **Part B** and for deciding what to automate next.
 
 ### How we design checks
@@ -63,7 +61,6 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | HP-11 | No | `POST` with **all** optional fields valid; `GET` by id | All supplied fields round-trip correctly |
 | HP-12 | No | Set `status` to `Completed`; `GET` | `completedAt` set per product rules |
 
-*Note: **HP-08–10** run in **sequence** on one card (serial lifecycle), not as three isolated setups.*
 
 ### 3.2 Negative / boundary / edge cases
 
@@ -83,9 +80,9 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | NEG-12 | No | Very long strings in text fields | **400** or success within documented limits |
 | NEG-13 | No | UI: submit create/edit with empty required fields | Validation blocks or clear errors; no silent save |
 | NEG-14 | No | UI: act on stale or deleted record | Clear message; no crash |
-| NEG-16 | No | `PUT` existing id with invalid `status` (e.g. `DONE`) (regression **BUG-004**) | **400**; invalid enum not persisted |
-| NEG-17 | No | `PUT` with `title` and/or `customerName` as empty string `""` (regression **BUG-006**) | **400**; empty strings not persisted |
-| NEG-18 | No | `POST`/`PUT` with `customerEmail` clearly invalid but containing `@` (e.g. `a@`) (regression **BUG-007**) | **400** if strict email rules apply; otherwise document actual rule |
+| NEG-16 | No | `PUT` existing id with invalid `status` (e.g. `DONE`) | **400**; invalid enum not persisted |
+| NEG-17 | No | `PUT` with `title` and/or `customerName` as empty string `""` | **400**; empty strings not persisted |
+| NEG-18 | No | `POST`/`PUT` with `customerEmail` clearly invalid but containing `@` (e.g. `a@`) | **400** if strict email rules apply; otherwise document actual rule |
 
 ### 3.3 Cross-field validations
 
@@ -96,7 +93,7 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | XF-03 | No | Same rules on **POST** vs **PUT** for required fields, whitespace, enums | Consistent unless partial update is specified |
 | XF-04 | No | Optional field **omitted** vs **null** on create/update | Consistent handling |
 | XF-05 | No | UI list/detail vs API `GET` by id after edits | Same logical state |
-| XF-06 | No | `status` `Completed` then `PUT` to `Open` or `InProgress`; `GET` (regression **BUG-005**) | `completedAt` is **null** when status is not `Completed` (or product rule documented) |
+| XF-06 | No | `status` `Completed` then `PUT` to `Open` or `InProgress`; `GET` | `completedAt` is **null** when status is not `Completed` (or product rule documented) |
 
 ### 3.4 API-specific scenarios (authentication, pagination, error responses)
 
@@ -117,13 +114,13 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | API-PAGE-03 | Yes | Very large `pageSize` | No **5xx** |
 | API-PAGE-04 | No | Consecutive pages (e.g. page 1 then 2) with fixed `pageSize` | No skipped or duplicate records across pages |
 | API-PAGE-05 | No | List with `search` / `status` / `priority` filters | Only matching rows; stable with paging |
-| API-PAGE-06 | No | Same `pageSize`: `page=1` then `page=2`; compare to contiguous slice of a full unpaged or large-page list (regression **BUG-001**) | First id on page 2 is the immediate successor of last id on page 1 in server order; **no skipped records** |
+| API-PAGE-06 | No | Same `pageSize`: `page=1` then `page=2`; compare to contiguous slice of a full unpaged or large-page list | First id on page 2 is the immediate successor of last id on page 1 in server order; **no skipped records** |
 
 #### Search (list API)
 
 | ID | Automated | Scenario | Expected outcome |
 |----|-----------|----------|------------------|
-| API-SEARCH-01 | No | `GET` list with `search` equal to a known title in different letter casing (regression **BUG-009**) | Same logical matches as exact-case search (case-insensitive) |
+| API-SEARCH-01 | No | `GET` list with `search` equal to a known title in different letter casing | Same logical matches as exact-case search (case-insensitive) |
 
 #### Error responses
 
@@ -134,7 +131,7 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | API-ERR-03 | Yes | After successful `DELETE`, `GET` same id | **200** with empty/null-like body (current automation contract—not necessarily ideal **404**) |
 | API-ERR-04 | No | Error payloads for **400**, **401/403**, **404** | Consistent JSON shape where applicable |
 | API-ERR-05 | No | Success responses | `Content-Type` and stable field names for clients |
-| API-ERR-06 | No | `GET /api/jobcards/{id}` where `id` is a valid numeric route value but no row exists (e.g. `999999`) (regression **BUG-002**) | **404** with a clear error payload; not **200** with an empty body |
+| API-ERR-06 | No | `GET /api/jobcards/{id}` where `id` is a valid numeric route value but no row exists (e.g. `999999`) | **404** with a clear error payload; not **200** with an empty body |
 
 ### 3.5 UI-specific scenarios (form validation, user flows)
 
@@ -155,9 +152,9 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 | UI-FLOW-03 | Yes | Delete job card with confirmation; verify removed from list | Feedback shown; card absent when searched |
 | UI-FLOW-04 | No | Search by **customer name** (and casing variants) | Correct results; case behavior documented |
 | UI-FLOW-05 | No | Pagination controls with search / filters | Page resets or behavior documented; no stale page |
-| UI-FLOW-06 | No | From list **page > 1**, submit **Search** (regression **BUG-003**) | List request uses **`page=1`** with the new search term (no stale `page` in the first fetch); results match page-1 expectation |
-| UI-FLOW-07 | No | After delete success message, **clear search** and use **Next** / **Search** / other navigation (regression **BUG-008**) | Success message auto-dismisses or clears on the next meaningful action; does not stay indefinitely |
-| UI-FLOW-08 | No | Search a known title using **only different casing** (regression **BUG-009**) | Same card(s) as exact-case search (case-insensitive) |
+| UI-FLOW-06 | No | From list **page > 1**, submit **Search** | List request uses **`page=1`** with the new search term (no stale `page` in the first fetch); results match page-1 expectation |
+| UI-FLOW-07 | No | After delete success message, **clear search** and use **Next** / **Search** / other navigation | Success message auto-dismisses or clears on the next meaningful action; does not stay indefinitely |
+| UI-FLOW-08 | No | Search a known title using **only different casing** | Same card(s) as exact-case search (case-insensitive) |
 
 ---
 
@@ -173,6 +170,6 @@ Structured with: **happy path**, **negative/boundary/edge**, **cross-field valid
 ### Risks
 
 - **Validation drift** between UI, `POST`, and `PUT` (empty strings, enums, email).
-- **Pagination and search** bugs (off-by-one, stale page after search, case sensitivity)—several confirmed in `bug-report.md` (**BUG-001**, **BUG-003**, **BUG-009**) and covered by **API-PAGE-06**, **UI-FLOW-06**, **UI-FLOW-08**, **API-SEARCH-01**.
+- **Pagination and search** bugs (off-by-one, stale page after search, case sensitivity)
 - **Ambiguous HTTP contracts** (e.g. **200** with empty body for missing or deleted resources).
 - **Flaky UI automation** if selectors or timing are unstable; mitigated with stable hooks and state-based waits.
